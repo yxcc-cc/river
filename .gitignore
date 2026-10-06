@@ -1,0 +1,49 @@
+# ==================== 依赖与构建产物 ====================
+node_modules/
+.npm-global-cache/
+.npm-cache/
+.npm/
+target/
+backend/target/
+frontend/dist/
+dist/
+build/
+*.class
+__pycache__/
+*.pyc
+*.pyo
+
+# ==================== IDE / 编辑器 ====================
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+
+# ==================== 本地凭据与配置（禁止入库）====================
+.env
+.env.local
+application-local.yml
+application-local.properties
+*.local.yml
+.claude/
+
+# ESP32 固件的 WiFi 凭据（参照同目录 secrets.h.example 自行创建）
+secrets.h
+
+# ==================== 运行时抓拍与人脸数据（含个人隐私）====================
+# 告警抓拍、人脸考勤照片、人脸特征编码均涉及他人肖像与生物特征，
+# 一律不入库。仓库内保留空的目录占位（见 .gitkeep 说明）。
+backend/uploads/
+tools/captures/
+encodings.json
+test_cam0.jpg
+
+# ==================== 大体积模型权重 ====================
+# yolov8n.pt 约 6.3MB，如需分发请用 Git LFS 或由使用者自行下载
+*.pt
+*.pth
+*.onnx
+
+# ==================== 硬件驱动安装包 ====================
+tools/CH341SER.EXE

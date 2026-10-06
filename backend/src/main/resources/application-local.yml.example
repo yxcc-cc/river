@@ -1,0 +1,10 @@
+# 复制本文件为 application-local.yml 并填入你自己的本地配置
+# application-local.yml 已被 .gitignore 忽略，不会提交到仓库
+spring:
+  datasource:
+    username: root
+    password: 你的MySQL密码
+
+jwt:
+  # 建议换成一段足够长的随机字符串
+  secret: 请填入你的JWT签名密钥

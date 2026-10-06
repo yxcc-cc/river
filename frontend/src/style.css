@@ -1,0 +1,195 @@
+/* Global reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #303133;
+  background: linear-gradient(135deg, #e8edff 0%, #eef1fb 30%, #f0f4ff 60%, #f5f7fa 100%);
+  background-attachment: fixed;
+}
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+}
+
+/* Element Plus theme overrides */
+:root {
+  --el-color-primary: #3861fb;
+  --el-color-primary-light-3: #6b8aff;
+  --el-color-primary-light-5: #94a9ff;
+  --el-color-primary-light-7: #bdc9ff;
+  --el-color-primary-light-8: #d1dbff;
+  --el-color-primary-light-9: #e8edff;
+  --el-color-primary-dark-2: #2d4ec9;
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-border-radius-round: 20px;
+}
+
+/* Card style - glassmorphism */
+.el-card {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.25s, background 0.25s;
+}
+
+.el-card:hover {
+  box-shadow: 0 4px 20px rgba(56, 97, 251, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.el-card__header {
+  border-bottom: 1px solid rgba(245, 245, 245, 0.8);
+  padding: 14px 20px;
+}
+
+/* Button */
+.el-button--primary {
+  background: linear-gradient(135deg, #3861fb 0%, #5b7cfa 100%);
+  border: none;
+}
+
+.el-button--primary:hover {
+  background: linear-gradient(135deg, #2d4ec9 0%, #4a6ae8 100%);
+}
+
+/* Table */
+.el-table {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.el-table th.el-table__cell {
+  background: rgba(250, 250, 250, 0.8) !important;
+  font-weight: 600;
+  font-size: 13px;
+  color: #606266;
+}
+
+.el-table td.el-table__cell {
+  font-size: 13px;
+}
+
+/* Tag */
+.el-tag {
+  border-radius: 6px;
+}
+
+/* Dialog */
+.el-dialog {
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.el-dialog__header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(240, 240, 240, 0.8);
+}
+
+.el-dialog__body {
+  padding: 20px 24px;
+}
+
+/* Input */
+.el-input__wrapper {
+  border-radius: 8px;
+}
+
+/* Select */
+.el-select .el-input__wrapper {
+  border-radius: 8px;
+}
+
+/* Pagination */
+.el-pagination {
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+/* Badge */
+.el-badge__content {
+  font-size: 11px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(56, 97, 251, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 97, 251, 0.3);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  .el-card__body {
+    padding: 12px;
+  }
+
+  .el-form--inline .el-form-item {
+    margin-bottom: 8px;
+  }
+
+  .el-pagination {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+/* Table horizontal scroll wrapper */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Page title */
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+}
+
+/* Empty state */
+.el-empty {
+  padding: 40px 0;
+}
+
+/* Fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}

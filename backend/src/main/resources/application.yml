@@ -1,0 +1,35 @@
+server:
+  port: 8081
+
+spring:
+  profiles:
+    # 本地真实凭据存放于 application-local.yml（已加入 .gitignore，不会入库）
+    # 新环境请参照 application-local.yml.example 自行创建该文件
+    active: local
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+  datasource:
+    url: jdbc:mysql://localhost:3306/riverbank_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.riverbank.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+jwt:
+  secret: ${JWT_SECRET:}
+  expiration: 7200000
+
+logging:
+  level:
+    com.riverbank.mapper: debug
