@@ -59,7 +59,42 @@ const int STREAM_PORT = 8082;
 #define LED_GPIO_NUM       4
 
 // 蜂鸣器
+// 用的是 KY-006 无源压电蜂鸣器模块（S / +V / -）：
+//   S  → GPIO14（给 PWM 方波，不是高低电平开关）
+//   +V → 5V
+//   -  → GND
+// 无源 = 没有内部振荡电路，直流喂它不会响，只会在通断瞬间「嗒」一声。
+// 必须给 2.7kHz 左右的方波才会持续发声，所以这里用 LEDC PWM。
 #define BUZZER_GPIO_NUM   14
+#define BUZZER_PWM_FREQ   2700   // 压电片谐振频率附近，最响
+#define BUZZER_PWM_RES    8      // 8 位分辨率
+#define BUZZER_PWM_DUTY   128    // 50% 占空比
+
+// 摄像头初始化时占用了 LEDC_TIMER_0 / LEDC_CHANNEL_0（给 XCLK 用），
+// 蜂鸣器必须换一个通道，否则会把摄像头时钟抢掉、画面直接黑掉。
+#define BUZZER_LEDC_CH    1
+
+// 说明：模块上那颗 PNP 三极管是高电平截止、低电平导通的，
+// 所以「静音」= 让 S 保持高电平（三极管关断，蜂鸣器彻底断电），
+// 而不是输出 0% 占空比的 PWM（那会一直给蜂鸣器供直流电，白耗电）。
+
+void buzzerInit() {
+  pinMode(BUZZER_GPIO_NUM, OUTPUT);
+  digitalWrite(BUZZER_GPIO_NUM, HIGH);   // 上电静音
+}
+
+void buzzerOn() {
+  ledcAttachChannel(BUZZER_GPIO_NUM, BUZZER_PWM_FREQ, BUZZER_PWM_RES, BUZZER_LEDC_CH);
+  ledcWriteChannel(BUZZER_LEDC_CH, BUZZER_PWM_DUTY);
+  Serial.println("[蜂鸣器] 响");
+}
+
+void buzzerOff() {
+  ledcDetach(BUZZER_GPIO_NUM);
+  pinMode(BUZZER_GPIO_NUM, OUTPUT);
+  digitalWrite(BUZZER_GPIO_NUM, HIGH);
+  Serial.println("[蜂鸣器] 停");
+}
 
 // ==================== HTTP服务器 ====================
 httpd_handle_t stream_httpd = NULL;
@@ -120,11 +155,9 @@ static esp_err_t buzzer_handler(httpd_req_t *req) {
   bool turnOff = strstr(buf, "\"off\"") != NULL;
 
   if (turnOn) {
-    digitalWrite(BUZZER_GPIO_NUM, HIGH);
-    Serial.println("[蜂鸣器] 响");
+    buzzerOn();
   } else if (turnOff) {
-    digitalWrite(BUZZER_GPIO_NUM, LOW);
-    Serial.println("[蜂鸣器] 停");
+    buzzerOff();
   }
 
   httpd_resp_set_type(req, "application/json");
@@ -166,19 +199,23 @@ void initCamera() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_LATEST;
-  config.fb_location = CAMERA_FB_IN_PSRAM;
 
-  // 根据PSRAM设置分辨率
+  // 根据PSRAM设置分辨率和画质
+  // ⚠️ 别贪高：800x600+画质10 每帧约 50KB，15fps 要 6Mbps，
+  //    家用 WiFi 撑不住会刷 FB-OVF（帧缓冲溢出）然后丢帧/重启。
+  //    VGA 640x480 + 画质12 每帧约 20KB，2~3Mbps，稳得多。
   if (psramFound()) {
-    config.frame_size = FRAMESIZE_VGA;  // 640x480
+    config.frame_size = FRAMESIZE_VGA;    // 640x480
     config.jpeg_quality = 12;
-    config.fb_count = 2;
-    Serial.println("[摄像头] PSRAM已找到，使用VGA分辨率");
+    config.fb_count = 3;                  // 多留一帧缓冲，抗突发抖动
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+    Serial.println("[摄像头] PSRAM已找到，使用VGA 640x480 / 画质12 / 3帧缓冲");
   } else {
-    config.frame_size = FRAMESIZE_SVGA;  // 800x600
-    config.jpeg_quality = 16;
+    config.frame_size = FRAMESIZE_QVGA;   // 320x240，没 PSRAM 时再降一档
+    config.jpeg_quality = 14;
     config.fb_count = 1;
-    Serial.println("[摄像头] 未找到PSRAM，使用SVGA分辨率");
+    config.fb_location = CAMERA_FB_IN_DRAM;
+    Serial.println("[摄像头] 未找到PSRAM，使用QVGA 320x240 / 画质14");
   }
 
   // 初始化摄像头
@@ -191,17 +228,18 @@ void initCamera() {
   // 获取传感器并调整设置
   sensor_t *s = esp_camera_sensor_get();
   if (s) {
-    s->set_brightness(s, 1);     // 亮度+1
-    s->set_contrast(s, 1);       // 对比度+1
+    s->set_brightness(s, 2);     // 亮度+2（室内/傍晚太暗，+1 不够）
+    s->set_contrast(s, 2);       // 对比度+2，对焦时更容易判断清不清楚
     s->set_saturation(s, 0);     // 饱和度默认
     s->set_whitebal(s, 1);       // 自动白平衡
     s->set_awb_gain(s, 1);       // AWB增益
     s->set_wb_mode(s, 0);        // 自动模式
     s->set_exposure_ctrl(s, 1);  // 自动曝光
     s->set_aec2(s, 1);           // AEC DSP
+    s->set_ae_level(s, 1);       // 曝光补偿 +1，暗环境提亮
     s->set_gain_ctrl(s, 1);      // 自动增益
     s->set_agc_gain(s, 0);       // 增益0
-    s->set_gainceiling(s, (gainceiling_t)6);  // 增益上限
+    s->set_gainceiling(s, (gainceiling_t)6);  // 增益上限（128x，最亮）
     s->set_bpc(s, 1);            // 坏点补偿
     s->set_wpc(s, 1);            // 白点补偿
     s->set_lenc(s, 1);           // 镜头校正
@@ -282,6 +320,12 @@ void setup() {
   Serial.println("  河边安全预警系统 - ESP32-CAM");
   Serial.println("================================");
 
+  // 关掉摄像头驱动的刷屏日志。
+  // FB-OVF 一旦发生就会每帧打一行，115200 波特率下打印本身就要排队，
+  // 结果就是「越溢出越卡、越卡越溢出」。
+  esp_log_level_set("cam_hal", ESP_LOG_NONE);
+  esp_log_level_set("sccb", ESP_LOG_NONE);
+
   // 初始化摄像头
   initCamera();
 
@@ -297,9 +341,8 @@ void setup() {
   pinMode(LED_GPIO_NUM, OUTPUT);
   digitalWrite(LED_GPIO_NUM, LOW);
 
-  // 初始化蜂鸣器（默认关闭）
-  pinMode(BUZZER_GPIO_NUM, OUTPUT);
-  digitalWrite(BUZZER_GPIO_NUM, LOW);
+  // 初始化蜂鸣器（默认静音）
+  buzzerInit();
 }
 
 void loop() {

@@ -128,7 +128,7 @@ const loadTrend = async () => {
         data: data.map(d => d.waterLevel),
         smooth: true,
         areaStyle: { opacity: 0.2 },
-        itemStyle: { color: '#1a73e8' }
+        itemStyle: { color: '#3ecf8e' }
       }],
       grid: { left: 60, right: 20, bottom: 30, top: 40 }
     })

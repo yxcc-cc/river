@@ -29,8 +29,8 @@ public class SensorController {
     }
 
     /**
-     * 添加或更新传感器端点
-     * POST /api/sensor/config {"deviceId":"2462ABEFC95C","endpoint":"http://10.234.223.69/water"}
+     * 添加或更新传感器端点（旧拉取模式用；需要先打开 sensor.polling.enabled）
+     * POST /api/sensor/config {"deviceId":"2462ABEFC95C","endpoint":"http://192.168.1.50/water"}
      */
     @PostMapping("/config")
     public Map<String, Object> configSensor(@RequestBody Map<String, String> body) {

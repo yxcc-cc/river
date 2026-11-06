@@ -29,6 +29,13 @@
           <el-table-column prop="lastHeartbeat" label="最后心跳" width="160">
             <template #default="{ row }">{{ row.lastHeartbeat ?? '--' }}</template>
           </el-table-column>
+          <el-table-column label="视频" width="90">
+            <template #default="{ row }">
+              <el-tag :type="row.streamUrl ? 'success' : 'info'" size="small">
+                {{ row.streamUrl ? '已配置' : '未配置' }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column prop="installedDate" label="安装日期" width="110" />
           <el-table-column label="操作" width="160" fixed="right">
             <template #default="{ row }">
@@ -73,7 +80,18 @@
           <el-button type="primary" link @click="getLocation">
             <el-icon><Location /></el-icon> 获取当前位置
           </el-button>
-          <span style="font-size: 12px; color: #909399; margin-left: 8px">点击自动填入当前经纬度</span>
+          <span style="font-size: 12px; color: #707070; margin-left: 8px">点击自动填入当前经纬度</span>
+        </el-form-item>
+        <el-form-item label="视频流地址">
+          <el-input
+            v-model="form.streamUrl"
+            placeholder="留空 = 用全局配置；如 https://xxx.trycloudflare.com/stream"
+            clearable
+          />
+          <div style="font-size: 12px; color: #707070; line-height: 1.5; margin-top: 4px">
+            这个点位摄像头的画面地址。家里跑隧道的话填隧道地址，
+            同局域网也可以填 http://192.168.31.77:8082/stream
+          </div>
         </el-form-item>
         <el-form-item label="安装日期">
           <el-date-picker v-model="form.installedDate" type="date" value-format="YYYY-MM-DD" />
@@ -122,7 +140,7 @@ const currentDevice = ref(null)
 const thresholdValue = ref(50)
 const dialogWidth = window.innerWidth < 768 ? '95%' : '550px'
 
-const form = reactive({ id: '', location: '', waterThreshold: 50, longitude: null, latitude: null, installedDate: '', description: '' })
+const form = reactive({ id: '', location: '', waterThreshold: 50, longitude: null, latitude: null, installedDate: '', description: '', streamUrl: '' })
 const rules = {
   id: [{ required: true, message: '请输入设备编号', trigger: 'blur' }],
   location: [{ required: true, message: '请输入部署位置', trigger: 'blur' }]
@@ -142,9 +160,9 @@ const openForm = (row) => {
   isEdit.value = !!row
   if (row) {
     currentEditId.value = row.id
-    Object.assign(form, { id: row.id, location: row.location, waterThreshold: row.waterThreshold, longitude: row.longitude, latitude: row.latitude, installedDate: row.installedDate, description: row.description })
+    Object.assign(form, { id: row.id, location: row.location, waterThreshold: row.waterThreshold, longitude: row.longitude, latitude: row.latitude, installedDate: row.installedDate, description: row.description, streamUrl: row.streamUrl || '' })
   } else {
-    Object.assign(form, { id: '', location: '', waterThreshold: 50, longitude: null, latitude: null, installedDate: '', description: '' })
+    Object.assign(form, { id: '', location: '', waterThreshold: 50, longitude: null, latitude: null, installedDate: '', description: '', streamUrl: '' })
   }
   formVisible.value = true
 }

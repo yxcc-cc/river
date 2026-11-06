@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="dashboard">
     <!-- Statistics Cards -->
     <el-row :gutter="16" class="stat-row">
@@ -107,7 +107,7 @@
                 <span class="data-value">{{ realtimeData[device.id].waterData?.batteryVoltage ?? '--' }} V</span>
               </div>
             </div>
-            <div class="device-data" v-else style="text-align: center; color: #c0c4cc; padding: 12px">
+            <div class="device-data" v-else style="text-align: center; color: #9aa8ba; padding: 12px">
               暂无数据
             </div>
           </div>
@@ -267,7 +267,7 @@ const loadDeviceStatusChart = async () => {
   deviceStatusChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c} 台 ({d}%)' },
     legend: { bottom: 0, textStyle: { fontSize: 12 } },
-    color: ['#67c23a', '#909399'],
+    color: ['#67c23a', '#64748d'],
     series: [{
       type: 'pie',
       radius: ['40%', '65%'],
@@ -354,7 +354,7 @@ const loadTrend = async () => {
         smooth: true,
         areaStyle: { opacity: 0.15 },
         lineStyle: { width: 2 },
-        itemStyle: { color: '#1a73e8' },
+        itemStyle: { color: '#533afd' },
         markLine: {
           silent: true,
           data: [
@@ -458,21 +458,21 @@ onUnmounted(() => {
 }
 
 .stat-card.online::before { background: linear-gradient(90deg, #67c23a, #95d475); }
-.stat-card.info::before { background: linear-gradient(90deg, #3861fb, #6b8aff); }
+.stat-card.info::before { background: linear-gradient(90deg, #533afd, #665efd); }
 .stat-card.warning::before { background: linear-gradient(90deg, #e6a23c, #f0c78a); }
 .stat-card.danger::before { background: linear-gradient(90deg, #f56c6c, #f89898); }
 
 .stat-value {
   font-size: 30px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: #0d253d;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
 .stat-label {
   font-size: 13px;
-  color: #909399;
+  color: #64748d;
   margin-top: 8px;
 }
 
@@ -487,7 +487,7 @@ onUnmounted(() => {
   border-bottom: 1px solid #f5f5f5;
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: #0d253d;
 }
 
 /* 设备列表 */
@@ -514,12 +514,12 @@ onUnmounted(() => {
 .device-id {
   font-weight: 600;
   font-size: 13px;
-  color: #303133;
+  color: #0d253d;
 }
 
 .device-location {
   font-size: 12px;
-  color: #909399;
+  color: #64748d;
 }
 
 .device-data {
@@ -535,14 +535,14 @@ onUnmounted(() => {
 }
 
 .data-label {
-  color: #909399;
+  color: #64748d;
   font-size: 12px;
 }
 
 .data-value {
   font-weight: 500;
   font-size: 13px;
-  color: #303133;
+  color: #0d253d;
 }
 
 .data-value.danger {
@@ -571,5 +571,74 @@ onUnmounted(() => {
   .stat-value { font-size: 20px; }
   .stat-label { font-size: 11px; }
   .chart-container { height: 200px; }
+}
+
+
+
+/* ============================================================
+   看板：Supabase 规范
+   白卡 + 细线 + 近黑数字，翠绿只留给"正常"状态
+   ============================================================ */
+
+.stat-card {
+  background: #ffffff !important;
+  border: 1px solid #ededed !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+.stat-card:hover {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+  background: #ffffff !important;
+}
+.stat-card::before {
+  display: none !important;
+}
+.stat-card :deep(.el-card__body) {
+  padding: 20px 22px !important;
+}
+
+/* 数字：近黑，weight 500，负字距（规范要求不超 500） */
+.stat-value {
+  font-size: 32px !important;
+  font-weight: 500 !important;
+  letter-spacing: -1.2px !important;
+  color: #171717 !important;
+  line-height: 1.05 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 12px !important;
+  color: #707070 !important;
+  font-weight: 400 !important;
+  margin-top: 6px !important;
+}
+
+.chart-container {
+  padding: 10px 14px 18px !important;
+}
+
+.el-card__header {
+  border-bottom: none !important;
+  padding: 18px 22px 2px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.1px !important;
+  color: #171717 !important;
+}
+
+.el-table th.el-table__cell {
+  background: #fafafa !important;
+}
+
+.device-live-card .label,
+.realtime-label {
+  color: #707070 !important;
+  font-size: 12px !important;
+}
+.device-live-card .value,
+.realtime-value {
+  color: #171717 !important;
+  font-size: 13px !important;
 }
 </style>

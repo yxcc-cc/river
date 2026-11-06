@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="login-page">
     <div class="page-card">
       <!-- ===== 左侧：登录 ===== -->
@@ -68,6 +68,7 @@
       <div class="right-panel" :class="slides[currentSlide].theme">
         <!-- 几何装饰 -->
         <div class="geo-group">
+          <div class="dots-matrix"></div>
           <div class="geo arc arc-1"></div>
           <div class="geo arc arc-2"></div>
           <div class="geo arc arc-3"></div>
@@ -270,18 +271,26 @@ const slides = [
 
 const currentSlide = ref(0)
 const screenTransition = ref('screen-flip')
+const sweepKey = ref(0)              // 每次切换 +1，重放扫光
 let slideTimer = null
+
+// 切换时先触发扫光，再换主题
+const switchSlide = (next) => {
+  sweepKey.value++
+  currentSlide.value = next
+}
+
 const startAutoSlide = () => {
   slideTimer = setInterval(() => {
     const next = (currentSlide.value + 1) % slides.length
     screenTransition.value = 'screen-flip'
-    currentSlide.value = next
+    switchSlide(next)
   }, 5000)
 }
 const goToSlide = (i) => {
   if (i === currentSlide.value) return
   screenTransition.value = i > currentSlide.value ? 'screen-flip' : 'screen-flip-back'
-  currentSlide.value = i
+  switchSlide(i)
 }
 onMounted(() => { startAutoSlide(); setTimeout(drawCaptcha, 100) })
 onUnmounted(() => clearInterval(slideTimer))
@@ -678,5 +687,415 @@ const handleLogin = async () => {
   .screen { width: 260px; }
   .base { width: 290px; }
   .laptop-box { width: 280px; height: 240px; }
+}
+
+
+
+
+/* ============================================================
+   参照稿：左侧极简白 + 右侧「大面积撞色块」
+   关键不是撒小图形，而是用大色块把画面切开（蒙德里安那种构成），
+   小圆点阵和细圆环只做点缀。
+   ============================================================ */
+
+/* ---------- 左侧 ---------- */
+.left-panel {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.particle-group,
+.deco-lines,
+.logo-glow { display: none !important; }
+
+.logo-icon-wrap {
+  background: #f2f3f5 !important;
+  border-radius: 14px;
+  width: 62px; height: 62px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-title { color: #0b0b10 !important; font-weight: 700 !important; font-size: 21px !important; letter-spacing: -0.2px; }
+.logo-sub { color: #a0a4ae !important; font-size: 11.5px !important; letter-spacing: 0.6px; }
+
+.left-panel :deep(.el-input__wrapper) {
+  height: 50px !important;
+  border-radius: 10px !important;
+  background: #f5f6f8 !important;
+  box-shadow: none !important;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+}
+.left-panel :deep(.el-input__wrapper:hover) { background: #f0f1f4 !important; }
+.left-panel :deep(.el-input__wrapper.is-focus) {
+  background: #ffffff !important;
+  border-color: #0b0b10 !important;
+}
+.left-panel :deep(.el-input__inner) { font-size: 14.5px; }
+
+.login-btn {
+  height: 50px !important;
+  border-radius: 10px !important;
+  background: #0b0b10 !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-weight: 600;
+  letter-spacing: 4px !important;
+  transition: all 0.2s ease !important;
+}
+.login-btn:hover { background: #23232d !important; transform: translateY(-1px); }
+
+/* ---------- 右侧：三套撞色 ---------- */
+.theme-blue { background: #1b3bc7 !important; }
+.theme-cyan { background: #2dd4bf !important; }
+.theme-navy { background: #6d28d9 !important; }
+
+.geo-group { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+/* —— 大色块 1：右上方的斜切块 —— */
+.geo-group::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 78%; height: 62%;
+  clip-path: polygon(30% 0, 100% 0, 100% 100%, 0 42%);
+  transition: background 0.8s ease;
+  z-index: 0;
+}
+
+/* —— 大色块 2：左下方的斜切块 —— */
+.geo-group::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: 0;
+  width: 66%; height: 52%;
+  clip-path: polygon(0 0, 100% 46%, 100% 100%, 0 100%);
+  transition: background 0.8s ease;
+  z-index: 0;
+}
+
+/* 三套主题各自的色块颜色 */
+.theme-blue .geo-group::before { background: #ff3d7f; }
+.theme-blue .geo-group::after  { background: #0a1b5e; }
+
+.theme-cyan .geo-group::before { background: #ef3b3b; }
+.theme-cyan .geo-group::after  { background: #101014; }
+
+.theme-navy .geo-group::before { background: #fb923c; }
+.theme-navy .geo-group::after  { background: #3c1287; }
+
+/* —— 实心大圆：压在色块交界处，制造层次 —— */
+.arc-1 {
+  position: absolute;
+  width: 132px !important; height: 132px !important;
+  border: none !important;
+  border-radius: 50% !important;
+  top: 54% !important; right: 12% !important;
+  animation: floatY 9s ease-in-out infinite !important;
+  z-index: 1;
+  transition: background 0.8s ease;
+}
+.theme-blue .arc-1 { background: #ffffff; }
+.theme-cyan .arc-1 { background: rgba(255, 255, 255, 0.9); }
+.theme-navy .arc-1 { background: #ffffff; }
+
+/* 半透明白圆，叠在色块上做层次 */
+.arc-2 {
+  position: absolute;
+  width: 96px !important; height: 96px !important;
+  border: 14px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 50% !important;
+  bottom: 18% !important; left: 12% !important;
+  animation: floatY 11s ease-in-out infinite reverse !important;
+  z-index: 1;
+}
+.theme-cyan .arc-2 { border-color: rgba(16, 16, 20, 0.35) !important; }
+
+/* 其余小元素降到很轻，只做点缀 */
+.arc-3 { width: 26px !important; height: 26px !important; border-width: 5px !important; border-color: rgba(255,255,255,0.5) !important; top: 12% !important; left: 12% !important; }
+
+.tri-1 {
+  border-left-width: 34px !important; border-right-width: 34px !important;
+  border-bottom-width: 58px !important;
+  top: 22% !important; left: 20% !important;
+  border-bottom-color: rgba(255, 255, 255, 0.75) !important;
+  animation: none !important;
+}
+.tri-2 {
+  border-left-width: 22px !important; border-right-width: 22px !important;
+  border-bottom-width: 38px !important;
+  bottom: 12% !important; right: 16% !important;
+  border-bottom-color: rgba(255, 255, 255, 0.55) !important;
+}
+
+.dot-1 { width: 14px !important; height: 14px !important; background: #fff !important; top: 72% !important; left: 34% !important; }
+.dot-2 { width: 8px !important; height: 8px !important; background: rgba(255,255,255,0.8) !important; top: 30% !important; right: 30% !important; }
+.dot-3 { width: 9px !important; height: 9px !important; background: rgba(255,255,255,0.7) !important; bottom: 30% !important; left: 20% !important; }
+.dot-4 { width: 6px !important; height: 6px !important; background: rgba(255,255,255,0.6) !important; top: 88% !important; right: 10% !important; }
+
+.ring-1 { width: 44px !important; height: 44px !important; border: 6px solid rgba(255,255,255,0.3) !important; bottom: 8% !important; right: 30% !important; }
+.ring-2 { width: 22px !important; height: 22px !important; border: 5px solid rgba(255,255,255,0.45) !important; top: 44% !important; left: 8% !important; }
+
+/* —— 点阵矩阵：右上角，参照稿里最标志性的那个元素 —— */
+.dots-matrix {
+  position: absolute;
+  top: 6%; right: 5%;
+  width: 118px; height: 118px;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 2.4px, transparent 2.5px);
+  background-size: 16px 16px;
+  z-index: 2;
+  pointer-events: none;
+}
+.theme-cyan .dots-matrix {
+  background-image: radial-gradient(circle, rgba(16, 16, 20, 0.85) 2.4px, transparent 2.5px);
+}
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* 笔记本压在最上层，阴影加实 */
+.laptop-box { z-index: 3; }
+.laptop { filter: drop-shadow(0 18px 36px rgba(0, 0, 0, 0.35)); }
+
+/* 底部文案 */
+.right-text { z-index: 4; }
+.right-text h3 { color: #fff !important; font-weight: 700; text-shadow: 0 2px 14px rgba(0,0,0,0.25); }
+.right-text p { color: rgba(255,255,255,0.86) !important; }
+
+.dots { z-index: 5; }
+.dots .dot { background: rgba(255,255,255,0.4) !important; }
+.dots .dot.active { background: #fff !important; width: 20px !important; border-radius: 3px; }
+
+/* 外框 */
+.login-page { background: #eceef2 !important; }
+.page-card {
+  border-radius: 16px !important;
+  box-shadow: 0 1px 2px rgba(16,24,40,0.05), 0 24px 60px rgba(16,24,40,0.12) !important;
+}
+
+
+/* ============================================================
+   真正的主题过渡
+   之前失败的三个原因，这次全避开：
+   1. 不能用 :key 重建元素 —— 一重建就没有 transition
+   2. 不能在 scoped 里用 :root 定义变量 —— 会被编译成 :root[data-v-x]，不生效
+   3. 不能用 background 简写 —— 要用 background-color 才参与过渡
+   ============================================================ */
+
+.right-panel {
+  transition: background-color 1.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 两个大色块：颜色和形变一起过渡 */
+.geo-group::before,
+.geo-group::after {
+  will-change: transform, background-color;
+  transition:
+    background-color 1.15s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 1.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.theme-blue .geo-group::before { background-color: #ff3d7f; transform: rotate(0deg) scale(1); }
+.theme-blue .geo-group::after  { background-color: #0a1b5e; transform: rotate(0deg) scale(1); }
+
+.theme-cyan .geo-group::before { background-color: #ef3b3b; transform: rotate(-7deg) scale(1.07); }
+.theme-cyan .geo-group::after  { background-color: #101014; transform: rotate(5deg) scale(1.04); }
+
+.theme-navy .geo-group::before { background-color: #fb923c; transform: rotate(6deg) scale(0.95); }
+.theme-navy .geo-group::after  { background-color: #3c1287; transform: rotate(-4deg) scale(1.05); }
+
+/* 几何元素：颜色和位置都过渡 */
+.arc-1, .arc-2, .tri-1, .tri-2, .dots-matrix {
+  transition:
+    background-color 1.15s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 1.15s cubic-bezier(0.4, 0, 0.2, 1),
+    top 1.15s cubic-bezier(0.4, 0, 0.2, 1),
+    left 1.15s cubic-bezier(0.4, 0, 0.2, 1),
+    right 1.15s cubic-bezier(0.4, 0, 0.2, 1),
+    bottom 1.15s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 1.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 每屏的构图不同，切换时图形会滑动 */
+.theme-blue .arc-1 { top: 54% !important; right: 12% !important; }
+.theme-cyan .arc-1 { top: 18% !important; right: 32% !important; background-color: rgba(255,255,255,0.92) !important; }
+.theme-navy .arc-1 { top: 60% !important; right: 20% !important; background-color: #ffffff !important; }
+
+.theme-blue .arc-2 { bottom: 18% !important; left: 12% !important; }
+.theme-cyan .arc-2 { bottom: 42% !important; left: 30% !important; }
+.theme-navy .arc-2 { bottom: 12% !important; left: 8% !important; }
+
+.theme-blue .tri-1 { top: 22% !important; left: 20% !important; }
+.theme-cyan .tri-1 { top: 42% !important; left: 42% !important; }
+.theme-navy .tri-1 { top: 14% !important; left: 10% !important; }
+
+.theme-blue .dots-matrix { transform: rotate(0deg); }
+.theme-cyan .dots-matrix { transform: rotate(12deg); }
+.theme-navy .dots-matrix { transform: rotate(-9deg); }
+
+/* 底部文案跟着淡入 */
+.right-text h3,
+.right-text p {
+  animation: textRise 0.7s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes textRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   左侧表单：改参考稿那种排版
+   左对齐、大标题、下划线输入框，留白撑开
+   ============================================================ */
+
+.form-area {
+  max-width: 370px !important;
+  text-align: left;
+}
+
+/* Logo 区左对齐、去掉居中留白 */
+.logo-area {
+  align-items: flex-start !important;
+  margin-bottom: 42px !important;
+  gap: 0;
+}
+.logo-icon-wrap {
+  width: 44px !important;
+  height: 44px !important;
+  margin-bottom: 22px !important;
+  border-radius: 12px !important;
+  background: #0b0b10 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.logo-icon-wrap svg {
+  width: 26px !important;
+  height: 26px !important;
+}
+/* logo 里那个盾牌换成白线，配深底更干净 */
+.logo-icon-wrap svg path { fill: none !important; stroke: #ffffff !important; }
+.logo-icon-wrap svg circle { fill: #ffffff !important; }
+
+.logo-title {
+  font-size: 30px !important;
+  line-height: 1.22 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.6px !important;
+  color: #0b0b10 !important;
+  text-align: left !important;
+  margin: 0 0 10px 0 !important;
+}
+.logo-sub {
+  font-size: 12.5px !important;
+  color: #a3a7b0 !important;
+  letter-spacing: 0.3px !important;
+  text-align: left !important;
+  margin: 0 !important;
+}
+
+/* 下划线输入框：去掉灰底和圆角 */
+.left-panel :deep(.el-form-item) {
+  margin-bottom: 26px !important;
+}
+.left-panel :deep(.el-input__wrapper) {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border-bottom: 1.5px solid #dcdfe5 !important;
+  padding: 4px 2px 10px 2px !important;
+  transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.left-panel :deep(.el-input__wrapper:hover) {
+  background: transparent !important;
+  border-bottom-color: #b9bec7 !important;
+}
+.left-panel :deep(.el-input__wrapper.is-focus) {
+  background: transparent !important;
+  border-bottom-color: #0b0b10 !important;
+  box-shadow: none !important;
+}
+.left-panel :deep(.el-input__inner) {
+  font-size: 15px !important;
+  color: #0b0b10 !important;
+}
+.left-panel :deep(.el-input__inner::placeholder) {
+  color: #b6bac2 !important;
+}
+/* 前缀图标淡一点 */
+.left-panel :deep(.el-input__prefix .el-icon) {
+  color: #b6bac2 !important;
+  margin-right: 4px;
+}
+
+/* 验证码画布：跟下划线输入框同高对齐 */
+.captcha-canvas {
+  height: 46px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e6e8ec !important;
+  background: #fafbfc !important;
+}
+.captcha-row {
+  align-items: flex-end !important;
+}
+
+/* 记住密码 */
+.form-options {
+  margin-bottom: 26px !important;
+}
+.form-options :deep(.el-checkbox__label) {
+  font-size: 13px !important;
+  color: #6b7280 !important;
+}
+
+/* 按钮：黑色全宽，字重加大 */
+.login-btn {
+  height: 52px !important;
+  border-radius: 10px !important;
+  background: #0b0b10 !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  letter-spacing: 5px !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.login-btn:hover {
+  background: #23232d !important;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(11, 11, 16, 0.18) !important;
+}
+.login-btn:active {
+  transform: translateY(0);
+}
+
+/* 去掉左侧顶部的 logo 方块，让标题直接起头 */
+.logo-icon-wrap {
+  display: none !important;
+}
+/* 标题成为最上面的元素，上留白重新分配 */
+.logo-area {
+  margin-bottom: 44px !important;
+  padding-top: 8px;
+}
+.logo-title {
+  margin: 0 0 12px 0 !important;
+}
+
+/* 修复：全局按钮文字色是"绿底配近黑"，登录页是黑底，必须强制白字 */
+.login-btn,
+.login-btn:hover,
+.login-btn:focus,
+.login-btn:active {
+  color: #ffffff !important;
+}
+.login-btn:hover {
+  background: #23232d !important;
+}
+.login-btn:hover > span,
+.login-btn > span {
+  color: #ffffff !important;
 }
 </style>

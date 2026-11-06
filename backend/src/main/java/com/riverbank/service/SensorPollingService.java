@@ -10,6 +10,7 @@ import com.riverbank.mapper.DeviceMapper;
 import com.riverbank.mapper.WaterDataMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,8 +26,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 定时拉取ESP32水位传感器数据
- * 解决手机热点下ESP32无法主动推送数据的问题
+ * 定时拉取ESP32水位传感器数据（可选模式）
+ *
+ * 现在设备已改成主动上报：POST /api/hardware/data/upload。
+ * 后端在公网、设备在家里局域网时，是「拉不到」的，所以这个拉取模式默认关闭，
+ * 需要时在 application.yml 里打开 sensor.polling.enabled。
  */
 @Slf4j
 @Service
@@ -39,6 +43,13 @@ public class SensorPollingService {
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * 是否启用「后端主动拉取设备」的旧模式。
+     * 默认 false：设备主动上报即可；只有局域网内部署、设备不开上报时才需要打开。
+     */
+    @Value("${sensor.polling.enabled:false}")
+    private boolean pollingEnabled;
+
     // 传感器设备列表：设备ID → ESP32的IP地址
     // 启动后可通过 /api/sensor/config 接口动态修改
     private final Map<String, String> sensorEndpoints = new HashMap<>();
@@ -46,24 +57,30 @@ public class SensorPollingService {
     private boolean initialized = false;
 
     /**
-     * 初始化传感器端点（从数据库读取设备信息）
+     * 初始化传感器端点
      */
     private void initIfNeeded() {
         if (initialized) return;
         initialized = true;
 
-        // 水位传感器：根据实际IP添加
-        sensorEndpoints.put("2462ABEFC95C", "http://10.234.223.69/water");
+        if (!pollingEnabled) {
+            log.info("[传感器轮询] 未启用（设备为主动上报模式）；需要拉取时设置 sensor.polling.enabled=true");
+            return;
+        }
+
+        // 局域网内部署示例：
+        // sensorEndpoints.put("2462ABEFC95C", "http://192.168.1.50/water");
 
         log.info("[传感器轮询] 初始化完成，监控 {} 个传感器", sensorEndpoints.size());
     }
 
     /**
-     * 每30秒拉取一次传感器数据
+     * 每30秒拉取一次传感器数据（仅在启用拉取模式时）
      */
     @Scheduled(fixedDelay = 30000, initialDelay = 10000)
     public void pollSensors() {
         initIfNeeded();
+        if (!pollingEnabled || sensorEndpoints.isEmpty()) return;
 
         for (Map.Entry<String, String> entry : sensorEndpoints.entrySet()) {
             String deviceId = entry.getKey();

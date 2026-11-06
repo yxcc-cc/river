@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-container class="main-layout">
     <!-- Mobile overlay -->
     <div v-if="isMobile && showDrawer" class="drawer-overlay" @click="showDrawer = false"></div>
@@ -480,5 +480,103 @@ onUnmounted(() => {
 
 .main-content::-webkit-scrollbar-track {
   background: transparent;
+}
+
+
+
+
+/* ============================================================
+   布局：Supabase 规范
+   侧边栏白底 + 右侧细线，选中项浅灰底 + 翠绿指示条
+   ============================================================ */
+
+.sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid #ededed !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.sidebar-logo {
+  border-bottom: 1px solid #ededed !important;
+  background: transparent !important;
+}
+.logo-title {
+  color: #171717 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.3px;
+  font-size: 14.5px !important;
+}
+
+.side-menu {
+  background: transparent !important;
+  border-right: none !important;
+}
+.side-menu :deep(.el-menu-item) {
+  color: #707070 !important;
+  border-radius: 6px;
+  margin: 1px 8px;
+  height: 38px;
+  line-height: 38px;
+  font-size: 13px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.side-menu :deep(.el-menu-item:hover) {
+  background: #fafafa !important;
+  color: #171717 !important;
+}
+.side-menu :deep(.el-menu-item.is-active) {
+  background: #f4f4f4 !important;
+  color: #171717 !important;
+  font-weight: 500;
+}
+/* 选中项左侧一条翠绿指示 */
+.side-menu :deep(.el-menu-item.is-active)::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 18px;
+  border-radius: 0 2px 2px 0;
+  background: #3ecf8e;
+}
+.side-menu :deep(.el-menu-item .el-icon) {
+  color: inherit !important;
+}
+
+/* 顶栏：白底 + 1px 细线 */
+.header {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid #ededed !important;
+  box-shadow: none !important;
+}
+
+.breadcrumb :deep(.el-breadcrumb__inner) {
+  color: #707070 !important;
+  font-weight: 400 !important;
+  font-size: 12.5px;
+}
+.breadcrumb :deep(.el-breadcrumb__inner.is-link:hover) {
+  color: #171717 !important;
+}
+.collapse-btn,
+.header-icon-btn {
+  color: #707070 !important;
+  border-radius: 6px;
+}
+.collapse-btn:hover,
+.header-icon-btn:hover {
+  background: #fafafa !important;
+  color: #171717 !important;
+}
+
+/* 内容区：近白画布 */
+.main-container,
+.el-main {
+  background: #fafafa !important;
 }
 </style>

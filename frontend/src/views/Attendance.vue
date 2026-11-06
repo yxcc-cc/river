@@ -19,7 +19,7 @@
               <video ref="videoRef" autoplay playsinline class="camera-video"></video>
               <canvas ref="canvasRef" style="display:none"></canvas>
               <div v-if="!cameraReady" class="camera-placeholder">
-                <el-icon :size="48" color="#c0c4cc"><VideoCamera /></el-icon>
+                <el-icon :size="48" color="#9a9a9a"><VideoCamera /></el-icon>
                 <p>点击下方按钮开启摄像头</p>
               </div>
               <!-- 人脸框 -->
@@ -228,7 +228,7 @@
               style="width: 50px; height: 50px; border-radius: 4px"
               fit="cover"
             />
-            <span v-else style="color: #c0c4cc">无</span>
+            <span v-else style="color: #9a9a9a">无</span>
           </template>
         </el-table-column>
       </el-table>
@@ -601,7 +601,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  color: #909399;
+  color: #707070;
 }
 
 .camera-actions {
@@ -672,7 +672,7 @@ onUnmounted(() => {
 
 .checkin-icon { background: rgba(103, 194, 58, 0.1); color: #67c23a; }
 .checkout-icon { background: rgba(230, 162, 60, 0.1); color: #e6a23c; }
-.work-icon { background: rgba(56, 97, 251, 0.1); color: #3861fb; }
+.work-icon { background: rgba(56, 97, 251, 0.1); color: #3ecf8e; }
 
 .status-info {
   display: flex;
@@ -682,13 +682,13 @@ onUnmounted(() => {
 
 .status-label {
   font-size: 13px;
-  color: #909399;
+  color: #707070;
 }
 
 .status-value {
   font-size: 20px;
   font-weight: 600;
-  color: #303133;
+  color: #171717;
 }
 
 /* Month stats */
@@ -709,14 +709,14 @@ onUnmounted(() => {
 .stat-num {
   font-size: 28px;
   font-weight: 700;
-  color: #3861fb;
+  color: #3ecf8e;
 }
 
 .stat-num.warning { color: #e6a23c; }
 
 .stat-label {
   font-size: 13px;
-  color: #909399;
+  color: #707070;
 }
 
 /* Filter bar */

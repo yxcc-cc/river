@@ -58,7 +58,7 @@
           <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
               <el-button v-if="row.isHandled === 0" type="primary" link @click="openHandle(row)">处理</el-button>
-              <span v-else style="color: #909399; margin-right: 8px">已闭环</span>
+              <span v-else style="color: #707070; margin-right: 8px">已闭环</span>
               <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
             </template>
           </el-table-column>

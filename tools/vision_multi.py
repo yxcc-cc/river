@@ -21,7 +21,7 @@ from socketserver import ThreadingMixIn
 from ultralytics import YOLO
 
 # ==================== 全局配置 ====================
-BASE_URL = "http://localhost:8081"
+BASE_URL = "http://47.111.116.134:8081"   # 后端在阿里云；本地调试改回 http://localhost:8081
 CONFIDENCE_THRESHOLD = 0.5
 ALERT_COOLDOWN = 10
 MODEL_NAME = "yolov8n.pt"
@@ -34,24 +34,38 @@ ROI_X2, ROI_Y2 = 0.95, 1.0
 
 PERSON_CLASS_ID = 0
 
+# ==================== 性能参数 ====================
+INFER_SIZE = 320            # 推理输入边长（640 → 320，快约4倍）
+INFER_MIN_INTERVAL = 0.05   # 每个设备两次推理之间至少间隔（秒）
+# 多个设备线程共用同一个模型，推理必须加锁，否则会互相踩
+model_lock = threading.Lock()
+INFER_DEVICE = "cpu"        # 启动时自动改成 0（GPU）
+
 # ==================== 设备列表 ====================
-# 每个设备：(设备ID, 视频源, 名称)
-# 视频源可以是 URL 或 USB摄像头编号(0, 1, 2...)
+# id 必须和后端 t_device 表里的记录一致，报警、抓拍才对得上。
+# source 支持三种：
+#   "http://x.x.x.x:8082/stream"   ESP32-CAM 的 MJPEG 流
+#   0 / 1 / 2                      USB 摄像头编号
+#   "D:/xx/yy.mp4"                 本地视频文件（用来模拟第二个点位）
+# buzzer_url 留空：蜂鸣器现在由现场那块 ESP32 自己轮询后端报警来触发，不用这边推。
 DEVICES = [
     {
-        "id": "DEV-001",
-        "name": "甘棠湖公园(ESP32-CAM)",
-        "source": "http://10.234.223.134:8082/stream",  # ESP32-CAM地址
-        "buzzer_url": "http://10.234.223.10/buzzer",  # 蜂鸣器模块IP（COM7）
+        "id": "2462ABEFC95C",
+        "name": "护池河公园(ESP32-CAM)",
+        "source": "http://192.168.31.77:8082/stream",
+        "buzzer_url": "",
         "enabled": True,
     },
-    {
-        "id": "DEV-006",
-        "name": "烟水亭湖畔(USB摄像头)",
-        "source": 0,  # USB摄像头（编号0）
-        "buzzer_url": "http://10.234.223.10/buzzer",  # 共用蜂鸣器模块（COM7）
-        "enabled": False,  # 关闭，摄像头留给 face_service 人脸签到用
-    },
+    # 模拟点位：测试多路功能时临时打开。
+    # 用 tools 目录下任意视频文件或上面提到的方式都行，跑完记得关掉，
+    # 不然它会一直报"有人"、一直上传截图。
+    # {
+    #     "id": "TEST-002",
+    #     "name": "测试点位2(模拟视频)",
+    #     "source": r"D:\harness\tmp\sim_cam.mp4",
+    #     "buzzer_url": "",
+    #     "enabled": False,
+    # },
 ]
 
 
@@ -177,6 +191,60 @@ class MJPEGReader:
 
 
 # ==================== 单设备检测线程 ====================
+# ==================== 视频源统一打开 ====================
+class VideoFileReader:
+    """本地视频文件循环播放，接口和 cv2.VideoCapture 对齐（read/release/isOpened）"""
+
+    def __init__(self, path):
+        self.path = path
+        self.cap = cv2.VideoCapture(path)
+        self._total = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+
+    def isOpened(self):
+        return self.cap.isOpened() and self._total > 0
+
+    def read(self):
+        ret, frame = self.cap.read()
+        if not ret:
+            # 播到结尾就从头再来，模拟一台一直在拍的摄像头
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = self.cap.read()
+        return ret, frame
+
+    def release(self):
+        try:
+            self.cap.release()
+        except Exception:
+            pass
+
+
+def open_source(source):
+    """
+    统一打开视频源，返回的对象只需要支持 read() 和 release()。
+    支持：USB 摄像头编号(int) / 本地视频文件 / MJPEG 流地址。
+    """
+    try:
+        if isinstance(source, int):
+            cap = cv2.VideoCapture(source)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            return cap if cap.isOpened() else None
+
+        is_url = isinstance(source, str) and source.lower().startswith(
+            ("http://", "https://", "rtsp://")
+        )
+        if is_url:
+            reader = MJPEGReader(source)
+            return reader if reader.start() else None
+
+        # 其余情况当本地视频文件
+        reader = VideoFileReader(source)
+        return reader if reader.isOpened() else None
+    except Exception as e:
+        print(f"打开视频源失败 {source}: {e}")
+        return None
+
+
 def device_worker(device_info):
     """每个设备一个独立线程"""
     dev_id = device_info["id"]
@@ -189,23 +257,12 @@ def device_worker(device_info):
 
     print(f"[{dev_id}] {name} - 启动中... 视频源: {source}")
 
-    # 打开视频源（URL用MJPEGReader，USB用OpenCV）
-    if isinstance(source, int):
-        cap = cv2.VideoCapture(source)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        if not cap.isOpened():
-            state.error = "无法连接视频源"
-            state.status = "ERROR"
-            print(f"[{dev_id}] {name} - 无法连接视频源: {source}")
-            return
-    else:
-        cap = MJPEGReader(source)
-        if not cap.start():
-            state.error = "无法连接视频源"
-            state.status = "ERROR"
-            print(f"[{dev_id}] {name} - 无法连接视频源: {source}")
-            return
+    cap = open_source(source)
+    if cap is None:
+        state.error = "无法连接视频源"
+        state.status = "ERROR"
+        print(f"[{dev_id}] {name} - 无法连接视频源: {source}")
+        return
 
     state.status = "SAFE"
     print(f"[{dev_id}] {name} - 已连接，开始检测")
@@ -221,15 +278,8 @@ def device_worker(device_info):
             print(f"[{dev_id}] {name} - 视频流断开，5秒后重连...")
             time.sleep(5)
             cap.release()
-            if isinstance(source, int):
-                cap = cv2.VideoCapture(source)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                ok = cap.isOpened()
-            else:
-                cap = MJPEGReader(source)
-                ok = cap.start()
-            if ok:
+            cap = open_source(source)
+            if cap is not None:
                 state.error = None
                 state.status = "SAFE"
                 print(f"[{dev_id}] {name} - 重连成功")
@@ -250,9 +300,20 @@ def device_worker(device_info):
         cv2.rectangle(overlay, (roi_x1, roi_y1), (roi_x2, roi_y2), (0, 255, 0), 2)
         cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
 
-        # YOLO检测
+        # YOLO检测（低分辨率 + 全局锁：多设备共用同一模型）
         roi_frame = frame[roi_y1:roi_y2, roi_x1:roi_x2]
-        results = model(roi_frame, conf=CONFIDENCE_THRESHOLD, classes=[PERSON_CLASS_ID], verbose=False)
+        try:
+            with model_lock:
+                results = model(roi_frame,
+                                conf=CONFIDENCE_THRESHOLD,
+                                classes=[PERSON_CLASS_ID],
+                                imgsz=INFER_SIZE,
+                                device=INFER_DEVICE,
+                                verbose=False)
+        except Exception as e:
+            print(f"[{device_info['id']}] 推理出错: {e}")
+            time.sleep(0.5)
+            continue
 
         person_count = 0
         for result in results:
@@ -482,7 +543,19 @@ def main():
     # 加载模型
     print(f"[*] 加载YOLOv8模型 ({MODEL_NAME})...")
     model = YOLO(MODEL_NAME)
-    print("[OK] 模型加载完成")
+
+    # 有 GPU 就用 GPU（需要装 CUDA 版的 torch）
+    global INFER_DEVICE
+    try:
+        import torch
+        if torch.cuda.is_available():
+            INFER_DEVICE = 0
+            print(f"[OK] 用 GPU 推理: {torch.cuda.get_device_name(0)}")
+        else:
+            print("[!] torch 是 CPU 版，用 CPU 推理（慢）")
+    except ImportError:
+        print("[!] 没装 torch，用 CPU 推理")
+    print(f"[OK] 模型加载完成 | 推理分辨率 {INFER_SIZE}px | device={INFER_DEVICE}")
 
     # 启动视频流服务器
     stream_thread = threading.Thread(target=start_stream_server, daemon=True)

@@ -27,8 +27,27 @@ mybatis-plus:
       id-type: auto
 
 jwt:
-  secret: ${JWT_SECRET:}
+  # 必须由环境变量 JWT_SECRET 或 application-local.yml 提供；缺失时启动直接失败，避免带病运行
+  secret: ${JWT_SECRET}
   expiration: 7200000
+
+hardware:
+  # 设备端上报时需带请求头 X-Device-Key，值与此处一致
+  # 留空 = 不校验（仅建议本地调试；生产务必配置）
+  api-key: ${HARDWARE_API_KEY:}
+
+sensor:
+  # 旧模式：后端定时去设备 IP 拉数据（只有能和设备同网段时才有效，例如局域网内部署）
+  # 设备现在改为主动上报，所以默认关闭，避免在公网服务器上一直超时
+  polling:
+    enabled: false
+
+stream:
+  # 摄像头视频流的公网地址。家里跑 cloudflared / frp 隧道后，把地址填在这里。
+  # 前端打开监控页时会问 GET /api/config/stream 拿这个值，不用改前端代码。
+  # 留空 = 前端回退到同源 /stream（本地开发用 Vite 代理转 8083）。
+  # 可用启动参数覆盖：--stream.public-url=https://xxx.trycloudflare.com/stream
+  public-url: ${STREAM_PUBLIC_URL:https://lol-attempting-wan-worth.trycloudflare.com/stream}
 
 logging:
   level:

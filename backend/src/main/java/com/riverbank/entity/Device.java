@@ -19,4 +19,11 @@ public class Device {
     private BigDecimal waterThreshold;
     private LocalDate installedDate;
     private String description;
+
+    /**
+     * 该点位的视频流地址。
+     * 留空表示用全局配置 stream.public-url（单点位场景）。
+     * 多点位时每台设备可以配自己的一路流。
+     */
+    private String streamUrl;
 }

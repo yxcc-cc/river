@@ -11,4 +11,9 @@ public interface AlertService {
     long countUnhandled();
     void deleteAlert(Long alertId);
     void clearAlerts(String status);
+
+    /**
+     * 取某台设备当前未处理的最新报警（给设备端轮询用，没有就返回 null）。
+     */
+    AlertEvent findUnhandledAlert(String deviceId);
 }

@@ -15,6 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -69,6 +72,29 @@ public class HardwareController {
     }
 
     /**
+     * 设备端轮询「我现在要不要报警」。
+     * 因为后端在公网、设备在家里，只能由设备主动来问，不能由后端推。
+     * 返回 alarm=true 时，设备上的蜂鸣器就响。
+     */
+    @GetMapping("/alert/check")
+    public Result<Map<String, Object>> checkAlert(@RequestParam String deviceId) {
+        Map<String, Object> result = new HashMap<>();
+        if (!isValidDeviceId(deviceId)) {
+            return Result.error(400, "非法设备ID");
+        }
+        var alert = alertService.findUnhandledAlert(deviceId);
+        result.put("alarm", alert != null);
+        if (alert != null) {
+            // 带上 id：设备端靠它判断「这条响过了没有」，否则同一条报警会被反复触发
+            result.put("alertId", alert.getId());
+            result.put("alertType", alert.getAlertType());
+            result.put("waterLevel", alert.getWaterLevel());
+            result.put("alertTime", alert.getAlertTime());
+        }
+        return Result.success(result);
+    }
+
+    /**
      * Upload a capture image from the vision detector.
      */
     @PostMapping("/image/upload")
@@ -76,6 +102,9 @@ public class HardwareController {
                                                    @RequestParam MultipartFile image) {
         if (image.isEmpty()) {
             return Result.error(400, "图片不能为空");
+        }
+        if (!isValidDeviceId(deviceId)) {
+            return Result.error(400, "非法设备ID");
         }
         try {
             // Create upload directory: uploads/captures/date/
@@ -181,15 +210,26 @@ public class HardwareController {
 
     /**
      * Delete a capture image.
+     * 只允许删除 uploads/captures 目录下的文件，防止路径穿越。
      */
     @DeleteMapping("/image/delete")
     public Result<?> deleteCapture(@RequestParam String url) {
         // url like: /uploads/captures/20260601/DEV-001_143025_123.jpg
-        String relativePath = url.startsWith("/") ? url.substring(1) : url;
-        File file = new File(relativePath);
-        if (file.exists() && file.delete()) {
-            log.info("Deleted capture: {}", url);
-            return Result.success();
+        Path base = Paths.get("uploads", "captures").toAbsolutePath().normalize();
+        String rel = url.replaceFirst("^/+", "").replaceFirst("^uploads/captures/", "");
+        Path target = base.resolve(rel).normalize();
+        if (!target.startsWith(base)) {
+            log.warn("Rejected path traversal attempt: {}", url);
+            return Result.error(400, "非法路径");
+        }
+        try {
+            if (Files.isRegularFile(target) && Files.deleteIfExists(target)) {
+                log.info("Deleted capture: {}", target);
+                return Result.success();
+            }
+        } catch (IOException e) {
+            log.error("Failed to delete capture {}", target, e);
+            return Result.error(500, "删除失败");
         }
         return Result.error(404, "文件不存在");
     }
@@ -221,5 +261,12 @@ public class HardwareController {
         }
         log.info("Cleared {} captures for device {}", count, deviceId);
         return Result.success(count);
+    }
+
+    /**
+     * 设备ID只允许字母、数字、下划线和短横线，避免被拼进文件路径时出问题。
+     */
+    private static boolean isValidDeviceId(String id) {
+        return id != null && id.matches("[A-Za-z0-9_-]{1,64}");
     }
 }

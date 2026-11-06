@@ -3,6 +3,11 @@
  * 硬件：ESP32-CAM + JSN-SR04T 防水超声波模块
  * 功能：用摄像头空闲引脚(GPIO1/GPIO3)接传感器，定时测距上传
  *
+ * ⚠️ 本固件是「只有一块 ESP32-CAM」时的折中方案 —— 让摄像头板兼职测水位。
+ *    现在已有独立的 ESP32 开发板（见 esp32_water_sensor），
+ *    正常部署不再需要这份：CAM 专职跑视频流，水位交给独立板。
+ *    保留仅作回顾/备用（例如再买一块 CAM 时可用）。
+ *
  * ⚠️ 注意：此固件会占用串口引脚，烧录后无法用Serial监视器调试
  *         调试方式：查看后端日志 / 前端数据页面
  *
@@ -25,10 +30,8 @@
 // 首次使用请复制 secrets.h.example 为 secrets.h
 #include "secrets.h"
 
-// 后端服务器（电脑连手机热点后的IP地址）
-// 连上热点后在电脑 cmd 输入 ipconfig 查看
-const char* SERVER_URL = "http://10.234.223.xxx:8081/api/hardware/data/upload";
-//                       ↑ 改成你电脑连热点后的IP！
+// 后端服务器（阿里云公网）
+const char* SERVER_URL = "http://47.111.116.134:8081/api/hardware/data/upload";
 
 // 超声波引脚（摄像头空闲引脚）
 const int TRIG_PIN = 1;   // U0T - 串口TX

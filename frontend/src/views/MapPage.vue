@@ -130,7 +130,7 @@ const getMarkerIcon = (device) => {
     warning: '#e6a23c',
     danger: '#f56c6c'
   }
-  const color = device.status === 1 ? (colors[device.levelKey] || '#67c23a') : '#909399'
+  const color = device.status === 1 ? (colors[device.levelKey] || '#67c23a') : '#707070'
   const size = device.levelKey === 'danger' ? 36 : 30
 
   return new AMap.Icon({
@@ -243,7 +243,7 @@ const initMap = () => {
           <div><b>阈值:</b> ${device.waterThreshold ?? '--'} cm</div>
           <div><b>坐标:</b> ${lng}, ${lat}</div>
           <div style="margin-top:8px">
-            <a href="/monitor?dev=${device.id}" style="color:#3861fb;text-decoration:none;font-weight:500;font-size:13px" onclick="event.preventDefault(); window.__goMonitor && window.__goMonitor('${device.id}')">
+            <a href="/monitor?dev=${device.id}" style="color:#3ecf8e;text-decoration:none;font-weight:500;font-size:13px" onclick="event.preventDefault(); window.__goMonitor && window.__goMonitor('${device.id}')">
               📹 查看实时监控
             </a>
           </div>
@@ -314,13 +314,13 @@ onUnmounted(() => {
 <style scoped>
 .map-page { padding: 0; }
 .card-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-.legend { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #606266; }
+.legend { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #212121; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .dot-green { background: #67c23a; }
 .dot-blue { background: #409eff; }
 .dot-orange { background: #e6a23c; }
 .dot-red { background: #f56c6c; }
-.dot-gray { background: #909399; }
+.dot-gray { background: #707070; }
 
 .map-wrapper { height: 550px; border-radius: 8px; overflow: hidden; }
 
@@ -347,9 +347,9 @@ onUnmounted(() => {
 
 .device-data { display: flex; flex-direction: column; gap: 4px; }
 .data-row { display: flex; justify-content: space-between; align-items: center; }
-.data-label { font-size: 12px; color: #909399; }
+.data-label { font-size: 12px; color: #707070; }
 .data-value { font-size: 13px; font-weight: 500; }
-.data-value.coord { font-size: 11px; color: #909399; font-family: monospace; }
+.data-value.coord { font-size: 11px; color: #707070; font-family: monospace; }
 
 .water-bar-bg {
   margin-top: 8px;

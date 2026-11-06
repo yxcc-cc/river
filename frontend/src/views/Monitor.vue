@@ -12,7 +12,7 @@
       </div>
       <el-button-group>
         <el-button
-          v-for="mode in ['grid', 'single']"
+          v-for="mode in ['single', 'grid']"
           :key="mode"
           :type="viewMode === mode ? 'primary' : ''"
           size="small"
@@ -53,14 +53,20 @@
             </template>
             <div class="stream-container" :class="{ 'alert-flash': dev.status === 'ALERT' }">
               <img
+                v-if="dev.streamUrl"
                 :src="dev.streamUrl"
                 class="stream-image"
                 @load="dev.connected = true"
                 @error="dev.connected = false"
                 :alt="dev.name"
               />
-              <div v-if="!dev.connected" class="stream-overlay">
-                <el-icon :size="40" color="#c0c4cc"><VideoCamera /></el-icon>
+              <div v-if="!dev.streamUrl" class="stream-overlay">
+                <el-icon :size="40" color="#9a9a9a"><VideoCamera /></el-icon>
+                <p>该点位未配置视频</p>
+                <p class="hint">在设备管理里填上视频流地址</p>
+              </div>
+              <div v-else-if="!dev.connected" class="stream-overlay">
+                <el-icon :size="40" color="#9a9a9a"><VideoCamera /></el-icon>
                 <p>视频流未连接</p>
               </div>
               <div v-if="dev.status === 'ALERT'" class="alert-badge">
@@ -97,16 +103,22 @@
             </template>
             <div class="stream-container large" :class="{ 'alert-flash': selectedDevice.status === 'ALERT' }">
               <img
+                v-if="selectedDevice.streamUrl"
                 :src="selectedDevice.streamUrl"
                 class="stream-image"
                 @load="selectedDevice.connected = true"
                 @error="selectedDevice.connected = false"
                 :alt="selectedDevice.name"
               />
-              <div v-if="!selectedDevice.connected" class="stream-overlay">
-                <el-icon :size="48" color="#c0c4cc"><VideoCamera /></el-icon>
+              <div v-if="!selectedDevice.streamUrl" class="stream-overlay">
+                <el-icon :size="48" color="#9a9a9a"><VideoCamera /></el-icon>
+                <p>该点位未配置视频</p>
+                <p class="hint">在设备管理里填上这个点位的视频流地址</p>
+              </div>
+              <div v-else-if="!selectedDevice.connected" class="stream-overlay">
+                <el-icon :size="48" color="#9a9a9a"><VideoCamera /></el-icon>
                 <p>视频流未连接</p>
-                <p class="hint">请先运行: <code>python tools/vision_multi.py</code></p>
+                <p class="hint">检查摄像头电源、WiFi，以及本机的检测脚本是否在跑</p>
               </div>
             </div>
           </el-card>
@@ -152,7 +164,7 @@
                 <img :src="item.url" class="capture-thumb" @click="previewImage(item.url)" />
                 <div class="capture-info" @click="previewImage(item.url)">
                   <span class="capture-time">{{ formatTime(item.filename) }}</span>
-                  <span class="capture-date">{{ item.deviceId }}</span>
+                  <span class="capture-date">{{ formatDate(item.date) }} · {{ item.deviceId }}</span>
                 </div>
                 <el-button type="danger" :icon="Delete" circle size="small" @click.stop="handleDeleteCapture(item, index)" />
               </div>
@@ -175,30 +187,82 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { WarningFilled, CircleCheckFilled, VideoCamera, Picture, DataBoard, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCaptureList, deleteCapture, clearCaptures } from '../api'
+import { getDevices, getCaptureList, deleteCapture, clearCaptures } from '../api'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
 const route = useRoute()
 
-// 设备列表（和 vision_multi.py 的 DEVICES 对应）
-const devices = ref([
-  { id: 'DEV-001', name: '甘棠湖公园(ESP32-CAM)', streamUrl: '/stream?dev=DEV-001', connected: false, status: 'SAFE' },
-  { id: 'DEV-006', name: '烟水亭湖畔(USB摄像头)', streamUrl: '/stream?dev=DEV-006', connected: false, status: 'SAFE' },
-])
+// 全局视频流地址（隧道），后端 /api/config/stream 下发，隧道换了只改后端配置
+const _q = new URLSearchParams(window.location.search)
+const STREAM_OVERRIDE = _q.get('stream') || ''
 
-const viewMode = ref('grid')  // grid = 多画面, single = 单画面
-const selectedDevId = ref('DEV-001')
+let _globalStream = ''
+async function resolveGlobalStream() {
+  if (STREAM_OVERRIDE) return STREAM_OVERRIDE
+  if (_globalStream) return _globalStream
+  try {
+    const r = await fetch('/api/config/stream')
+    const j = await r.json()
+    const url = j?.data?.url
+    if (url) {
+      _globalStream = url
+      return url
+    }
+  } catch (e) {
+    // 后端没配就回退同源代理
+  }
+  return '/stream'
+}
+
+// 设备列表：从后端 /api/devices 拉，支持多点位
+// 每台设备的流地址优先用自己配的 streamUrl，没配就用全局地址
+const devices = ref([])
+const viewMode = ref('single')  // single = 单画面（默认）, grid = 多画面
+const selectedDevId = ref('')
 const captureList = ref([])
 const previewVisible = ref(false)
 const previewUrl = ref('')
 
-let stompClient = null
-let checkTimer = null
-let alertTimers = {}
+const loadingDevices = ref(true)
+const deviceLoadError = ref('')
+
+async function loadDevices() {
+  loadingDevices.value = true
+  deviceLoadError.value = ''
+  try {
+    const globalStream = await resolveGlobalStream()
+    const res = await getDevices()
+    const list = (res && res.data) || []
+    // 只有一台设备时才用全局隧道地址兜底；
+    // 多点位时没配流的设备就留空（显示"未配置视频"），否则多路会抢同一路流
+    const fallbackStream = list.length === 1 ? globalStream : ''
+    devices.value = list.map(d => ({
+      id: d.id,
+      name: d.location || d.id,
+      // 自己配了流就用自己的，否则按上面的规则兜底
+      streamUrl: d.streamUrl || fallbackStream,
+      rawUrl: d.streamUrl || fallbackStream,
+      aiUrl: d.streamUrl || fallbackStream,
+      connected: false,
+      status: 'SAFE',
+      waterThreshold: d.waterThreshold,
+      online: d.status === 1,
+      lastHeartbeat: d.lastHeartbeat
+    }))
+    if (devices.value.length > 0 && !devices.value.some(d => d.id === selectedDevId.value)) {
+      selectedDevId.value = devices.value[0].id
+    }
+  } catch (e) {
+    console.error('加载设备列表失败:', e)
+    deviceLoadError.value = '设备列表加载失败，请检查后端连接'
+  } finally {
+    loadingDevices.value = false
+  }
+}
 
 const selectedDevice = computed(() =>
-  devices.value.find(d => d.id === selectedDevId.value) || devices.value[0]
+  devices.value.find(d => d.id === selectedDevId.value) || devices.value[0] || {}
 )
 
 const hasAnyAlert = computed(() =>
@@ -206,8 +270,12 @@ const hasAnyAlert = computed(() =>
 )
 
 const onlineCount = computed(() =>
-  devices.value.filter(d => d.connected).length
+  devices.value.filter(d => d.online || d.connected).length
 )
+
+let stompClient = null
+let checkTimer = null
+let alertTimers = {}
 
 const loadCaptureList = async () => {
   try {
@@ -227,14 +295,23 @@ const loadCaptureList = async () => {
   }
 }
 
+// 文件名格式：{设备ID}_{HHmmss}_{毫秒}.jpg
+// 比如 2462ABEFC95C_165921_406.jpg  →  16:59:21
+// 注意不能取 split('_') 的最后一段，那是毫秒，会显示成 "40:6:" 这种怪东西
 const formatTime = (filename) => {
   if (!filename) return ''
-  const parts = filename.replace('.jpg', '').split('_')
-  if (parts.length >= 2) {
-    const timeStr = parts[parts.length - 1]
-    return `${timeStr.substring(0, 2)}:${timeStr.substring(2, 4)}:${timeStr.substring(4, 6)}`
+  const m = filename.match(/_(\d{6})_/)
+  if (m) {
+    const t = m[1]
+    return `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}`
   }
   return filename
+}
+
+// 20261027 → 10-27
+const formatDate = (date) => {
+  if (!date || date.length !== 8) return ''
+  return `${date.slice(4, 6)}-${date.slice(6, 8)}`
 }
 
 const previewImage = (url) => {
@@ -311,13 +388,17 @@ const setupWebSocket = () => {
   stompClient.activate()
 }
 
-onMounted(() => {
-  // 支持从地图跳转：/monitor?dev=DEV-001
+onMounted(async () => {
+  // 先把设备列表拉回来，后面所有逻辑都依赖它
+  await loadDevices()
+
+  // 支持从地图跳转：/monitor?dev=xxx
   const devParam = route.query.dev
-  if (devParam && devices.value.find(d => d.id === devParam)) {
+  if (devParam && devices.value.some(d => d.id === devParam)) {
     selectedDevId.value = devParam
     viewMode.value = 'single'
   }
+
   loadCaptureList()
   checkStreamStatus()
   setupWebSocket()
@@ -356,7 +437,7 @@ onUnmounted(() => {
 }
 
 .device-count {
-  color: #606266;
+  color: #212121;
   font-size: 14px;
 }
 
@@ -383,7 +464,7 @@ onUnmounted(() => {
 
 .device-id-tag {
   font-size: 12px;
-  color: #909399;
+  color: #707070;
   font-family: monospace;
 }
 
@@ -435,7 +516,7 @@ onUnmounted(() => {
 
 .stream-overlay .hint {
   font-size: 13px;
-  color: #c0c4cc;
+  color: #9a9a9a;
 }
 
 code {
@@ -486,7 +567,7 @@ code {
 }
 
 .status-label {
-  color: #606266;
+  color: #212121;
   font-size: 14px;
 }
 
@@ -531,11 +612,11 @@ code {
 .capture-time {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: #171717;
 }
 
 .capture-date {
   font-size: 12px;
-  color: #909399;
+  color: #707070;
 }
 </style>

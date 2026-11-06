@@ -1,4 +1,23 @@
 <template>
+  <!-- 桌面通知开关提示：浏览器不会主动问，得用户点一下才给权限 -->
+  <div v-if="showNotifyTip" class="notify-tip">
+    <span class="notify-tip-text">
+      <template v-if="notifyState === 'denied'">
+        通知被浏览器拦住了，点地址栏左边的锁 → 通知 → 允许
+      </template>
+      <template v-else>
+        开启桌面通知后，切走页面或最小化也能收到报警
+      </template>
+    </span>
+    <el-button
+      v-if="notifyState !== 'denied'"
+      type="primary"
+      size="small"
+      @click="enableNotify"
+    >开启</el-button>
+    <el-button size="small" link @click="dismissNotifyTip">以后再说</el-button>
+  </div>
+
   <!-- 中央弹窗遮罩 -->
   <div v-if="isCenter && toasts.length > 0" class="alert-overlay" @click="toasts = []"></div>
 
@@ -68,6 +87,149 @@ const isCenter = computed(() => route.path !== '/monitor')
 
 const AUTO_DISMISS = 8000 // 8秒自动消失
 
+// ==================== 桌面通知 + 标题提醒 ====================
+// 页面内的弹窗只在「你盯着这个后台」时有用。
+// 切走了标签页、最小化了、人在外面，就什么都收不到。
+// 所以补两层：
+//   1. 页面不可见时发系统通知（浏览器在后台也能弹）
+//   2. 标题栏闪动，未读数挂在标题上
+const BASE_TITLE = document.title
+let unreadCount = 0
+let titleTimer = null
+let notifyPermission = ('Notification' in window) ? Notification.permission : 'unsupported'
+
+// 通知开关的界面状态：granted / default / denied / unsupported
+const notifyState = ref(('Notification' in window) ? Notification.permission : 'unsupported')
+const showNotifyTip = ref(false)
+const NOTIFY_TIP_KEY = 'notify-tip-dismissed'
+
+const dismissNotifyTip = () => {
+  showNotifyTip.value = false
+  localStorage.setItem(NOTIFY_TIP_KEY, '1')
+}
+
+// 手动点「开启」
+const enableNotify = async () => {
+  if (!('Notification' in window)) return
+  try {
+    const p = await Notification.requestPermission()
+    notifyState.value = p
+    notifyPermission = p
+    if (p === 'granted') {
+      showNotifyTip.value = false
+      try {
+        new Notification('通知已开启', {
+          body: '河边出现报警时会在这里提醒你',
+          tag: 'riverbank-welcome'
+        })
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+// 浏览器要求「用户交互后」才能申请通知权限，所以第一次点击页面时问一次
+const askNotifyPermission = async () => {
+  if (!('Notification' in window)) return
+  if (Notification.permission !== 'default') {
+    notifyPermission = Notification.permission
+    notifyState.value = Notification.permission
+    return
+  }
+  try {
+    notifyPermission = await Notification.requestPermission()
+    notifyState.value = notifyPermission
+    if (notifyPermission === 'granted') showNotifyTip.value = false
+  } catch (e) {
+    notifyPermission = 'denied'
+  }
+}
+
+const notifyDesktop = (alert) => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  if (!document.hidden) return   // 页面正开着就不用系统通知了，页内弹窗已经够
+  try {
+    const isIntrusion = alert.alertType === 'INTRUSION_ALARM'
+    const title = isIntrusion ? '⚠ 入侵报警' : '⚠ 水位报警'
+    const place = alert.deviceLocation || alert.deviceId || ''
+    const body = isIntrusion
+      ? `${place} 检测到人员靠近`
+      : `${place} 水位 ${alert.waterLevel ?? '--'} cm`
+    const n = new Notification(title, {
+      body,
+      tag: 'riverbank-alert',      // 同一个 tag 会替换旧的，不会堆一屏
+      requireInteraction: false,
+      silent: false
+    })
+    n.onclick = () => {
+      window.focus()
+      n.close()
+    }
+  } catch (e) {}
+}
+
+const stopTitleFlash = () => {
+  if (titleTimer) {
+    clearInterval(titleTimer)
+    titleTimer = null
+  }
+  unreadCount = 0
+  document.title = BASE_TITLE
+  setAlertFavicon(false)
+}
+
+// 标签页图标变成红色感叹号 —— 纯 canvas 画的，不依赖任何浏览器权限。
+// 系统通知被拦的时候，这是最显眼的一个提示：标签栏上直接变红。
+const ORIGINAL_FAVICON = (() => {
+  const link = document.querySelector("link[rel*='icon']")
+  return link ? link.href : ''
+})()
+
+function setAlertFavicon(on) {
+  try {
+    let link = document.querySelector("link[rel*='icon']")
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = 'icon'
+      document.head.appendChild(link)
+    }
+    if (!on) {
+      if (ORIGINAL_FAVICON) link.href = ORIGINAL_FAVICON
+      return
+    }
+    const size = 64
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#f56c6c'
+    ctx.beginPath()
+    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `bold ${Math.floor(size * 0.68)}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('!', size / 2, size / 2 + 2)
+    link.href = canvas.toDataURL('image/png')
+  } catch (e) {}
+}
+
+const startTitleFlash = () => {
+  setAlertFavicon(true)
+  if (document.hidden === false) return   // 人在看，就不用闪
+  if (titleTimer) return
+  let flip = false
+  titleTimer = setInterval(() => {
+    document.title = flip ? `(${unreadCount}) 有报警！` : BASE_TITLE
+    flip = !flip
+  }, 800)
+}
+
+// 切回页面就停闪、清零
+const onVisibilityChange = () => {
+  if (!document.hidden) stopTitleFlash()
+}
+
 const formatTime = (t) => {
   if (!t) return ''
   return t.substring(11, 19)
@@ -85,6 +247,13 @@ const showToast = (alert) => {
     audio.volume = 0.3
     audio.play().catch(() => {})
   } catch (e) {}
+
+  // 页面不在前台时：系统通知 + 标题闪动
+  if (document.hidden) {
+    unreadCount++
+    notifyDesktop(alert)
+    startTitleFlash()
+  }
 
   // 自动消失
   setTimeout(() => dismiss(id), AUTO_DISMISS)
@@ -106,6 +275,19 @@ const goToAlerts = () => {
 }
 
 onMounted(() => {
+  // 通知权限：现代浏览器要求用户交互过才能申请，绑一次性点击
+  if ('Notification' in window) {
+    notifyState.value = Notification.permission
+    if (Notification.permission === 'default') {
+      window.addEventListener('click', askNotifyPermission, { once: true })
+    }
+    // 还没拿到权限、且用户没说过「以后再说」，就在页面顶部提示一条
+    if (Notification.permission !== 'granted' && !localStorage.getItem(NOTIFY_TIP_KEY)) {
+      showNotifyTip.value = true
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
   stompClient = new Client({
     webSocketFactory: () => new SockJS('/ws'),
     reconnectDelay: 5000,
@@ -122,6 +304,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('click', askNotifyPermission)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  stopTitleFlash()
   if (stompClient) stompClient.deactivate()
 })
 </script>
@@ -342,5 +527,28 @@ onUnmounted(() => {
 @keyframes toastCenterOut {
   0%   { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.6); }
+}
+/* ===== 桌面通知提示条 ===== */
+.notify-tip {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-left: 4px solid #409eff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  color: #606266;
+  max-width: 90vw;
+}
+.notify-tip-text {
+  line-height: 1.4;
 }
 </style>
